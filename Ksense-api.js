@@ -1,6 +1,6 @@
 //Variable declarations
 
-const API_KEY = "YOUR API KEY HERE";
+const API_KEY = "Your_API_Key_Here";
 const BASE_URL = "https://assessment.ksensetech.com/api/patients";
 
 //Fetch the individual page with retry mechanism and backoff strategy to handle intermitten failures and rate limiting
@@ -58,9 +58,9 @@ async function fetchAllData(limit = 20) {
 
 async function handleData(){
     const data = await fetchAllData();
-    var highRisk = [];
-    var feverRisk = [];
-    var dataIssue = [];
+    let highRisk = [];
+    let feverRisk = [];
+    let dataIssue = [];
 
     for(const patient of data){
         let points = 0;
@@ -76,9 +76,14 @@ async function handleData(){
         const gender = patient.gender;
         if(gender == null || gender == "" || (gender !== "M" && gender !== "F")) dataIssue.push(id); 
         if (patient.blood_pressure && typeof patient.blood_pressure === "string") {
-            [systolic, diastolic] = patient.blood_pressure.split("/").map(Number);
-        } else {
-            dataIssue.push(id);
+            const parts = patient.blood_pressure.split("/").map(Number);
+            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                [systolic, diastolic] = parts;
+            } else {
+                dataIssue.push(id);
+            }
+            } else {
+                dataIssue.push(id);
         }
         const temp = patient.temperature;
         if(temp == null || temp == 0 || isNaN(temp)) dataIssue.push(id);
@@ -88,8 +93,10 @@ async function handleData(){
         if(diagnosis == null || diagnosis == "" || !(typeof diagnosis === 'string')) dataIssue.push(id);
         const medications = patient.medications;
         for(const med of medications){
-            if(med == null || med == "" || !(typeof med === 'string')) dataIssue.push(id);
-            break;
+            if(med == null || med == "" || !(typeof med === 'string')) {
+                dataIssue.push(id);
+                break;
+            }
         }
 
         //calculate risk points
@@ -116,7 +123,7 @@ async function handleData(){
         } else if (temp >= 101) {
             points += 2;
             feverRisk.push(id);
-        } else if (temp >= 99.6) {
+        } else if (temp >= 99.6 && temp <= 100.9) {
             points += 1;
             feverRisk.push(id);
         }
@@ -130,26 +137,18 @@ async function handleData(){
 
 
 async function submit(results) {
-    try {
-        const response = await fetch('https://assessment.ksensetech.com/api/submit-assessment', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': API_KEY
-            },
-            body: JSON.stringify(results)
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('Assessment Results Submitted:', data);
-        return data;
-    } catch (err) {
-        console.error('Failed to submit assessment:', err);
-    }
+    fetch('https://assessment.ksensetech.com/api/submit-assessment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': API_KEY
+        },
+        body: JSON.stringify(results)
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('Assessment Results:', data);
+    });
 }
 
 (async () => {
